@@ -2,14 +2,16 @@ const std = @import("std");
 const config = @import("config");
 const rl = @import("raylib");
 
-const screenWidth = 810;
-const screenHeight = 450;
+const screenWidth = 1620;
+const screenHeight = 900;
 const sqsize = 30;
+
+const numBerries = 10;
 
 const horizsqs = screenWidth/sqsize + 4;
 const vertsqs = screenHeight/sqsize + 4;
 
-var squares = initializeSquares();
+var squares: [horizsqs][vertsqs]Square = undefined;
 
 pub fn main() anyerror!void {
     if (config.disableLog) {
@@ -19,6 +21,7 @@ pub fn main() anyerror!void {
     rl.initWindow(screenWidth, screenHeight + 30, "Conway's Game of Life");
     defer rl.closeWindow();
 
+    reset();
 
     rl.setTargetFPS(60);
 
@@ -64,7 +67,7 @@ pub fn main() anyerror!void {
                         0, 1 => squares[i][j].alive = false,
                         2 => {},
                         3 => {
-                            squares[i][j].alive = true;
+                            squares[i][j].setAlive();
                         },
                         else => squares[i][j].alive = false,
                     }
@@ -80,6 +83,12 @@ pub fn main() anyerror!void {
         rl.drawRectangle(screenWidth/2, sqsize*(vertsqs - 4), screenWidth, sqsize, .light_gray);
         rl.drawText("Reset", screenWidth/2 + 10, sqsize*(vertsqs - 4) + 5, 20, .black);
 
+        for (2..horizsqs - 2) |i| {
+            for (2..vertsqs - 2) |j| {
+                rl.drawRectangle(@intCast((i-2)*sqsize), @intCast((j-2)*sqsize), sqsize, sqsize, squares[i][j].colour());
+            }
+        }
+
         // Horizontal Lines
         for (0..screenHeight/sqsize+1) |_i| {
             const i: i32 = @intCast(_i);
@@ -90,39 +99,44 @@ pub fn main() anyerror!void {
             const i: i32 = @intCast(_i);
             rl.drawLine(i*sqsize, 0, i*sqsize, screenHeight, .light_gray);
         }
-
-        for (2..horizsqs - 2) |i| {
-            for (2..vertsqs - 2) |j| {
-                if (squares[i][j].alive) {
-                    rl.drawRectangle(@intCast((i-2)*sqsize), @intCast((j-2)*sqsize), sqsize, sqsize, .black);
-                }
-            }
-        }
         framesSinceConway += 1;
     }
 }
 
+const SqsState = enum {
+    empty,
+    berry,
+    seen,
+};
+
 const Square = struct {
     alive: bool,
+    state: SqsState,
+
+    fn setAlive(self: *Square) void {
+        self.alive = true;
+        self.state = .seen;
+    }
 
     fn convert(self: *Square) void {
         self.alive = !self.alive;
-    }
-};
-
-fn initializeSquares() [horizsqs][vertsqs]Square {
-    var ret: [horizsqs][vertsqs]Square = undefined;
-
-    for (0..horizsqs) |i| {
-        for (0..vertsqs) |j| {
-            ret[i][j] = .{
-                .alive = false,
-            };
+        if (self.alive) {
+            self.state = .seen;
         }
     }
 
-    return ret;
-}
+    fn colour(self: *Square) rl.Color {
+        if (self.alive) {
+            return .black;
+        }
+
+        return switch (self.state) {
+            .empty => .white,
+            .berry => .red,
+            .seen => .blue,
+        };
+    }
+};
 
 fn vecToIndices(vec: rl.Vector2) struct { usize, usize } {
     const xpos: usize = @intFromFloat(vec.x);
@@ -151,9 +165,20 @@ fn isSquareAlive(i: i32, j: i32) bool {
 }
 
 fn reset() void {
+    var berryCount: usize = 0;
     for (0..horizsqs) |i| {
         for (0..vertsqs) |j| {
-            squares[i][j].alive = false;
+            squares[i][j] = .{
+                .alive = false,
+                .state = blk: {
+                    if (berryCount < numBerries and j > 3 and i > 3) {
+                        berryCount += 1;
+                        break :blk .berry;
+                    } else {
+                        break :blk .empty;
+                    }
+                },
+            };
         }
     }
 }
