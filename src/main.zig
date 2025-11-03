@@ -165,20 +165,28 @@ fn isSquareAlive(i: i32, j: i32) bool {
 }
 
 fn reset() void {
-    var berryCount: usize = 0;
+    var berries = [_]bool{false}**((horizsqs-4)*(vertsqs-4));
+    for (0..numBerries) |i| {
+        berries[i] = true;
+    }
+    std.crypto.random.shuffle(bool, &berries);
+
+    var idx: u64 = 0;
     for (0..horizsqs) |i| {
         for (0..vertsqs) |j| {
             squares[i][j] = .{
                 .alive = false,
                 .state = blk: {
-                    if (berryCount < numBerries and j > 3 and i > 3) {
-                        berryCount += 1;
+                    if (berries[idx]) {
                         break :blk .berry;
                     } else {
                         break :blk .empty;
                     }
                 },
             };
+            if (i > 1 and i < horizsqs-2 and j > 1 and j < vertsqs-2 and idx < berries.len-1) {
+                idx += 1;
+            }
         }
     }
 }
